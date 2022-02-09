@@ -66,7 +66,7 @@ Modify enemy stats<br>
       /data/data only if you modifed server files for your device.<br>
     I recommend doing 1 and 2 for local files. And all 3 for server files.
 
-15. Open the game and see if it works-
+15. Open the game and see if it works
     
     ---
 
