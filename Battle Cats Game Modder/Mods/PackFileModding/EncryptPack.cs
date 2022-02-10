@@ -8,201 +8,163 @@ using static Battle_Cats_Game_Modder.Program;
 using System.Windows.Forms;
 using static Battle_Cats_Game_Modder.Mods.GameDataModding.FileHandler;
 using System.Diagnostics;
+using System.Reflection;
+using Battle_Cats_Game_Modder.Mods.GameDataModding;
+#pragma warning disable CS8602 // Dereference of a possibly null reference.
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
+#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
+#pragma warning disable CS8604 // Possible null reference argument for parameter 'ver' in 'Tuple<byte[], byte[], CipherMode> EncryptPack.GetKeyAndIV(string file_name, string ver)'.
+
+
+
+using Microsoft.WindowsAPICodePack.Dialogs;
 
 namespace Battle_Cats_Game_Modder.Mods.PackFileModding
 {
-    public class DecryptPack
+    public class EncryptPack
     {
-        public static byte[] DecryptData(Aes aesAlg, byte[] content)
+        public static void EncryptData()
         {
-            content = AddExtraBytes(null, false, content);
-            ICryptoTransform decryptor = aesAlg.CreateDecryptor(aesAlg.Key, aesAlg.IV);
+            Console.WriteLine("Please select a folder of game content");
+            CommonOpenFileDialog dialog = new();
+            dialog.InitialDirectory = Path.GetDirectoryName(Assembly.GetEntryAssembly().Location) + "\\game_files";
+            dialog.IsFolderPicker = true;
+            dialog.Title = "Select a folder of game files";
 
-            if (!Directory.Exists("game_files/"))
+            if (dialog.ShowDialog() != CommonFileDialogResult.Ok)
             {
-                Directory.CreateDirectory("game_files");
+                EncryptData();
             }
-            MemoryStream memory = new(content);
+            string path = dialog.FileName;
+            string name = Path.GetFileName(path);
 
-            using CryptoStream csDecrypt = new(memory, decryptor, CryptoStreamMode.Read);
-            byte[] bytes = new byte[content.Length];
-            csDecrypt.Read(bytes, 0, content.Length);
+            string final_folder_name = "encrypted_files/";
+            if (!Directory.Exists(final_folder_name))
+            {
+                Directory.CreateDirectory(final_folder_name);
+            }
 
-            return bytes;
+            Console.WriteLine("Creating list file...");
+            byte[] list_bytes = CreateListFile(path);
+            File.WriteAllBytes(final_folder_name + name + ".list", list_bytes);
+            Console.WriteLine("Done");
+
+            Console.WriteLine("Creating pack file...");
+            byte[] pack_bytes = CreatePackFile(path);
+            File.WriteAllBytes(final_folder_name + name + ".pack", pack_bytes);
+            Console.WriteLine("Done");
+
+            ColouredText($"&Encrypted files can be found at &{Path.GetFullPath(final_folder_name)}{name}.pack&\n");
+
         }
-        public static List<Tuple<string, int, int>> DecodeList(string path)
+        public static byte[] EncryptListFile(string list_file)
         {
-            List<List<string>> csv_data = ReadStringCSV(path);
-            List<Tuple<string, int, int>> decoded_csv_data = new();
-            foreach (List<string> line in csv_data)
-            {
-                string file_name = line[0];
-                int start_offset = int.Parse(line[1]);
-                int length = int.Parse(line[2]);
-                Tuple<string, int, int> line_data = Tuple.Create(file_name, start_offset, length);
-                decoded_csv_data.Add(line_data);
-            }
-            return decoded_csv_data;
+            using Aes aes = Aes.Create();
+
+            byte[] IV = new byte[16];
+            byte[] Key = Encoding.ASCII.GetBytes("b484857901742afc");
+
+            aes.Key = Key;
+            aes.IV = IV;
+            aes.Padding = PaddingMode.None;
+            aes.Mode = CipherMode.ECB;
+            return EncryptAES(null, aes, Encoding.ASCII.GetBytes(list_file));
         }
-        public static List<Tuple<string, int, int>> UnpackList(Tuple<string, string> file_group)
+        public static byte[] CreateListFile(string dir_name)
         {
-            List<Tuple<string, int, int>> list_data;
+            string[] files = Directory.GetFiles(dir_name);
 
-            byte[] pack_md5 = Encoding.ASCII.GetBytes("b484857901742afc");
-            byte[] empty_iv = new byte[16];
+            string list_file = files.Length + "\n";
+            int offset = 0;
+            for (int i = 0; i < files.Length; i++)
+            {
+                string file = files[i];
+                FileInfo fi = new(file);
+                int length = (int)fi.Length;
+                string file_name = Path.GetFileName(file);
 
-            using Aes aesAlg = Aes.Create();
-            aesAlg.Key = pack_md5;
-            aesAlg.IV = empty_iv;
-            aesAlg.Mode = CipherMode.ECB;
-            aesAlg.Padding = PaddingMode.PKCS7;
-
-            byte[] encrypted_list_data = File.ReadAllBytes(file_group.Item2);
-            byte[] decrypted_list_data = DecryptData(aesAlg, encrypted_list_data);
-            string path = $@"{decrypted_lists}/{Path.GetFileName(file_group.Item2)}";
-
-            File.WriteAllBytes(path, decrypted_list_data);
-            list_data = DecodeList(path);
-            return list_data;
+                list_file += $"{file_name},{offset},{length}\n";
+                offset += length;
+            }
+            byte[] list_data_encrypted = EncryptListFile(list_file);
+            return list_data_encrypted;
         }
-        public static bool UnpackPack(string path, List<Tuple<string, int, int>> list_data, string version, int index, int total_files)
+        public static Tuple<byte[], byte[], CipherMode> GetKeyAndIV(string file_name, string ver)
         {
-            List<byte> allData = File.ReadAllBytes(path).ToList();
-
-            string file_name = Path.GetFileName(path);
-
-            using Aes aesAlg = Aes.Create();
-            aesAlg.Mode = CipherMode.CBC;
-            byte[] Key;
-            byte[] IV;
-            if (version.ToLower() == "yes")
+            List<byte> IV = new();
+            List<byte> Key = new();
+            CipherMode mode = CipherMode.CBC;
+            if (file_name.Contains("Server"))
             {
-                Key = StringToByteArray("d754868de89d717fa9e7b06da45ae9e3");
-                IV = StringToByteArray("40b2131a9f388ad4e5002a98118f6128");
+                IV = new byte[16].ToList();
+                Key = Encoding.ASCII.GetBytes("89a0f99078419c28").ToList();
+                mode = CipherMode.ECB;
             }
-            else
+            else if (file_name.Contains("Local"))
             {
-                Key = StringToByteArray("0ad39e4aeaf55aa717feb1825edef521");
-                IV = StringToByteArray("d1d7e708091941d90cdf8aa5f30bb0c2");
-            }
-            if (file_name.ToLower().Contains("server"))
-            {
-                aesAlg.Mode = CipherMode.ECB;
-                Key = Encoding.ASCII.GetBytes("89a0f99078419c28");
-                IV = new byte[16];
-            }
-            aesAlg.Key = Key;
-            aesAlg.IV = IV;
-            aesAlg.Padding = PaddingMode.None;
-            if (list_data.Count == 0) return false;
-
-            current_bytes_unpacked = 0;
-            current_files_unpacked = 0;
-
-
-            for (int i = 0; i < list_data.Count; i++)
-            {
-                Tuple<string, int, int> file = list_data[i];
-                byte[] file_data = allData.GetRange(file.Item2, file.Item3).ToArray();
-                byte[] data_to_use;
-                if (file_name.ToLower().Contains("imagedatalocal"))
+                if (!file_name.Contains("ImageData"))
                 {
-                    data_to_use = file_data;
+                    if (ver.ToLower() == "yes")
+                    {
+                        Key = StringToByteArray("d754868de89d717fa9e7b06da45ae9e3").ToList();
+                        IV = StringToByteArray("40b2131a9f388ad4e5002a98118f6128").ToList();
+                    }
+                    else
+                    {
+                        Key = StringToByteArray("0ad39e4aeaf55aa717feb1825edef521").ToList();
+                        IV = StringToByteArray("d1d7e708091941d90cdf8aa5f30bb0c2").ToList();
+                    }
+                    mode = CipherMode.CBC;
+                }
+            }
+            return Tuple.Create(Key.ToArray(), IV.ToArray(), mode);
+        }
+        public static byte[] CreatePackFile(string dir_name)
+        {
+            Console.WriteLine("Are you using jp 10.8 and up?(yes/no)");
+            string ver = Console.ReadLine();
+
+            string[] files = Directory.GetFiles(dir_name);
+            List<byte> data = new();
+
+            using Aes aes = Aes.Create();
+            aes.Padding = PaddingMode.None;
+            for (int i = 0; i < files.Length; i++)
+            {
+                string file = files[i];
+                if (file.ToLower().Contains("imagedatalocal"))
+                {
+                    byte[] file_data = File.ReadAllBytes(file);
+                    data.AddRange(file_data.ToList());
                 }
                 else
                 {
-                    data_to_use = DecryptData(aesAlg, file_data);
+                    Tuple<byte[], byte[], CipherMode> aes_data = GetKeyAndIV(file, ver);
+                    aes.Key = aes_data.Item1;
+                    aes.IV = aes_data.Item2;
+                    aes.Mode = aes_data.Item3;
+
+                    data.AddRange(EncryptAES(file, aes));
                 }
-                Directory.CreateDirectory(@"game_files/" + Path.GetFileNameWithoutExtension(path));
-                File.WriteAllBytes(@"game_files/" + Path.GetFileNameWithoutExtension(path) + "/" + file.Item1, data_to_use);
-
-                float percentageF = ((float)i / (list_data.Count - 1)) * 100;
-                string percentage = percentageF.ToString("0.0");
-                float totalPercentageF = (float)(index + 1) / total_files * 100;
-                string totalPercentage = totalPercentageF.ToString("0.0");
-
-                ColouredText($"\r&Extracted: &{file.Item1,35} &from &{Path.GetFileName(file_name),22} & {i,4}&/&{(list_data.Count - 1)} &{percentage,4}%& - {(index + 1),2}/{total_files}  &{totalPercentage,4}%&                                   ", ConsoleColor.White, ConsoleColor.Green);
-                total_files_unpacked++;
-                total_bytes_unpacked += data_to_use.Length;
-                current_files_unpacked++;
-                current_bytes_unpacked += data_to_use.Length;
             }
-            return true;
+            return data.ToArray();
         }
-        static readonly string decrypted_lists = @"decrypted_lists";
-        static int total_files_unpacked = 0;
-        static int current_files_unpacked = 0;
-        static long current_bytes_unpacked = 0;
-        static long total_bytes_unpacked = 0;
-        public static void Decrypt()
+        public static byte[] EncryptAES(string path, Aes aes, byte[] data = null)
         {
-
-            Console.WriteLine("Are you running game version jp 10.8 and up? (yes, no)?");
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-            string ver = Console.ReadLine();
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-            OpenFileDialog fd = new()
+            byte[] bytef;
+            if (data != null) bytef = data;
+            else
             {
-                Multiselect = true,
-                Filter = "files (*.pack)|*.pack"
-            };
-            if (fd.ShowDialog() != DialogResult.OK)
-            {
-                Console.WriteLine("Please select .pack files");
-                Main();
+                bytef = File.ReadAllBytes(path);
             }
-            string[] paths = fd.FileNames;
-            if (!Directory.Exists(decrypted_lists))
-            {
-                Directory.CreateDirectory(decrypted_lists);
-            }
-            Stopwatch timer_total = Stopwatch.StartNew();
+            bytef = AddExtraBytes(null, false, bytef);
 
-            List<Tuple<string, string>> files = new();
-            foreach (string path in paths)
-            {
-                if (path.EndsWith(".pack"))
-                {
-#pragma warning disable CS8600 // Converting null literal or possible null value to non-nullable type.
-                    string dir = Path.GetDirectoryName(path);
-#pragma warning restore CS8600 // Converting null literal or possible null value to non-nullable type.
-#pragma warning disable CS8604 // Possible null reference argument for parameter 'path1' in 'string Path.Combine(string path1, string path2)'.
-                    string list_path = Path.Combine(dir, path.TrimEnd(".pack".ToCharArray()) + ".list");
-#pragma warning restore CS8604 // Possible null reference argument for parameter 'path1' in 'string Path.Combine(string path1, string path2)'.
-                    Tuple<string, string> group = Tuple.Create(path, list_path);
-                    files.Add(group);
-                }
-            }
-            for (int i = 0; i < files.Count; i++)
-            {
-                Stopwatch timer = Stopwatch.StartNew();
+            ICryptoTransform encryptor = aes.CreateEncryptor(aes.Key, aes.IV);
+            using MemoryStream ms = new(bytef);
+            using CryptoStream cs = new(ms, encryptor, CryptoStreamMode.Read);
+            cs.Read(bytef, 0, bytef.Length);
 
-                Tuple<string, string> file_group = files[i];
-                List<Tuple<string, int, int>> list_data = UnpackList(file_group);
-
-#pragma warning disable CS8604 // Possible null reference argument for parameter 'version' in 'bool DecryptPack.UnpackPack(string path, List<Tuple<string, int, int>> list_data, string version, int index, int total_files)'.
-                bool success = UnpackPack(file_group.Item1, list_data, ver, i, files.Count);
-#pragma warning restore CS8604 // Possible null reference argument for parameter 'version' in 'bool DecryptPack.UnpackPack(string path, List<Tuple<string, int, int>> list_data, string version, int index, int total_files)'.
-
-                timer.Stop();
-                TimeSpan timespan = timer.Elapsed;
-
-                string time = string.Format("&{0:00}&:&{1:00}&:&{2:00}&", timespan.Minutes, timespan.Seconds, timespan.Milliseconds / 10);
-
-                if (success)
-                {
-                    Console.SetCursorPosition(0, Console.CursorTop);
-                    ClearCurrentConsoleLine();
-                    ColouredText($"&Unpacked: &{Path.GetFileName(file_group.Item1),35}& to &{@"game_files/" + Path.GetFileNameWithoutExtension(file_group.Item1),40}/& in {time,5} & {current_files_unpacked,5}& files, and &{ConvertBytesToMegabytes(current_bytes_unpacked),5} MB&\n", New: ConsoleColor.Cyan);
-                }
-            }
-            timer_total.Stop();
-            TimeSpan timespan2 = timer_total.Elapsed;
-
-            string time2 = string.Format("&{0:00}&:&{1:00}&:&{2:00}&", timespan2.Minutes, timespan2.Seconds, timespan2.Milliseconds / 10);
-            ColouredText($"&Finished: unpacked &{files.Count}& packs, &{total_files_unpacked}& files and &{ConvertBytesToMegabytes(total_bytes_unpacked)} MB& in {time2}\n                                                      \n", New: ConsoleColor.Magenta);
-
+            return bytef;
         }
     }
 }

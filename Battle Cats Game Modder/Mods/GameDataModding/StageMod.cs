@@ -64,7 +64,7 @@ namespace Battle_Cats_Game_Modder.Mods.GameDataModding
             if (fd.ShowDialog() != DialogResult.OK)
             {
                 Console.WriteLine("Please select .csv files");
-                Main();
+                Options();
             }
             string path = fd.FileName;
 

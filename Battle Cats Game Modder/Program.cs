@@ -1,14 +1,70 @@
 ﻿using Battle_Cats_Game_Modder.Mods.PackFileModding;
 using Battle_Cats_Game_Modder.Mods.LibnativeModding;
 using Battle_Cats_Game_Modder.Mods.GameDataModding;
+using System.Net.Cache;
+using System.Net;
 #pragma warning disable CS8625 // Cannot convert null literal to non-nullable reference type.
 #pragma warning disable CA2211 // Non-constant fields should not be visible
 
 namespace Battle_Cats_Game_Modder;
+
 public static class Program
 {
     public static string multipleVals = "(You can enter multiple numbers seperated by spaces to edit multiple at once)";
+    public static string version = "1.0.0";
+    public static async void CheckUpdate()
+    {
+        HttpClient client = new();
+        string url = "https://raw.githubusercontent.com/fieryhenry/Battle-Cats-Game-Modder/master/version.txt";
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.GetAsync(url);
+        }
+        catch
+        {
+            ColouredText("&An error has occurred when checking for a new update\n", New: ConsoleColor.Red);
+            return;
+        }
+        if (!response.IsSuccessStatusCode)
+        {
+            ColouredText("&An error has occurred when checking for a new update\n", New: ConsoleColor.Red);
+            return;
+        }
+        response.EnsureSuccessStatusCode();
+        response.Headers.Add("time-stamp", DateTime.Now.Ticks.ToString());
+        string responseBody = await response.Content.ReadAsStringAsync();
+        responseBody = responseBody.TrimEnd('\n');
+        if (responseBody != version)
+        {
+            ColouredText("&A new version is available from the github\n", New: ConsoleColor.Green);
+        }
+    }
+
+    public static string MakeRequest(WebRequest request)
+    {
+        request.Headers.Add("time-stamp", DateTime.Now.Ticks.ToString());
+        HttpRequestCachePolicy noCachePolicy = new(HttpRequestCacheLevel.NoCacheNoStore);
+        request.CachePolicy = noCachePolicy;
+        WebResponse response = request.GetResponse();
+        string result;
+        using (Stream dataStream = response.GetResponseStream())
+        {
+            StreamReader reader = new(dataStream);
+            string responseFromServer = reader.ReadToEnd();
+            result = responseFromServer;
+        }
+        return result;
+    }
+    [STAThread]
     public static void Main()
+    {
+        Console.WindowWidth = 200;
+        Console.WindowHeight = 48;
+        CheckUpdate();
+        Options();
+    }
+    public static void Options()
     {
         string[] options =
         {
@@ -29,7 +85,7 @@ public static class Program
         }
         Console.WriteLine("Press enter to continue...");
         Console.ReadLine();
-        Main();
+        Options();
     }
     public static int[] ConvertCharArrayToIntArray(char[] input)
     {
@@ -39,7 +95,7 @@ public static class Program
     {
         Console.WriteLine(text + "\nPress enter to continue");
         Console.ReadLine();
-        Main();
+        Options();
     }
     public static double ConvertBytesToMegabytes(long bytes)
     {
@@ -66,12 +122,12 @@ public static class Program
         catch (OverflowException)
         {
             ColouredText("Input number was too large\n", ConsoleColor.White, ConsoleColor.DarkRed);
-            Main();
+            Options();
         }
         catch (FormatException)
         {
             ColouredText("Input given was not a number or it wasn't an integer\n", ConsoleColor.White, ConsoleColor.DarkRed);
-            Main();
+            Options();
         }
         return input;
     }

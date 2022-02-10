@@ -46,7 +46,7 @@ namespace Battle_Cats_Game_Modder.Mods.LibnativeModding
             if (fd.ShowDialog() != DialogResult.OK)
             {
                 Console.WriteLine("Please select .so files");
-                Main();
+                Options();
             }
             path = fd.FileName;
 
