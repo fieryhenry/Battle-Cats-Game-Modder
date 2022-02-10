@@ -46,7 +46,7 @@ Modify enemy stats<br>
 
 6. Once completed the files will be in /game_files
 
-7. You can manually edit the data, or use the option in the editor that you want
+7. You can manually edit the data, or use the option in the tool that you want
 
 8. Once edited, open the tool and select the encrypt option
 
