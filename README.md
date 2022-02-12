@@ -37,8 +37,7 @@ Modify enemy stats<br>
    Most stats are in DataLocal<br>
    Most text is in resLocal<br>
    Sprites are in various Server files<br>
-
-3. Run the tool - Download exe from [releases](https://github.com/fieryhenry/Battle-Cats-Game-Modder/releases)
+3. Run the tool - Download exe from [releases](https://github.com/fieryhenry/Battle-Cats-Game-Modder/releases) (You may need to install the .net 6 runtime: https://dotnet.microsoft.com/en-us/download/dotnet/6.0)
 
 4. Select option to decrypt .pack
 
