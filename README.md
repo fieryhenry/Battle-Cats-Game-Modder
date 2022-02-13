@@ -60,9 +60,9 @@ Modify enemy stats<br>
 13. Enter the system architecture the file is from
 
 14. Once done:
-      Replace the file in the apk for permanent change(apk must be signed - APK Easy Tool - for most devices to install the apk) (must re-install app/replace apk in /data/app/jp.co.ponos.battlecats.../base.apk if you choose this).<br>
-      /data/app to work without re-installing for your device.<br>
-      /data/data only if you modifed server files for your device.<br>
+      1. Replace the file in the apk for permanent change.(apk must be signed - APK Easy Tool - for most devices to install the apk) (must re-install app/replace apk in /data/app/jp.co.ponos.battlecats.../base.apk if you choose this).<br>
+      2. Replace the file in /data/app to work without re-installing for your device.<br>
+      3. replace the file in /data/data only if you modifed server files for your device.<br>
     I recommend doing 1 and 2 for local files. And all 3 for server files.
 
 15. Open the game and see if it works
