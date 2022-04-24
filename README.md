@@ -1,5 +1,6 @@
 # Battle Cats Game Modding Tool
-
+### New python version here: https://github.com/fieryhenry/BCGM-Python
+---
 A game modding tool for the game The Battle Cats<br>
 Most features should work across all game versions (least likely is libnative patch)
 
